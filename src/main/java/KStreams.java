@@ -3,10 +3,7 @@ import java.util.Properties;
 import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.apache.kafka.common.serialization.Deserializer;
-import org.apache.kafka.common.serialization.Serde;
-import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.common.serialization.Serializer;
+import org.apache.kafka.common.serialization.*;
 import org.apache.kafka.connect.json.JsonDeserializer;
 import org.apache.kafka.connect.json.JsonSerializer;
 import org.apache.kafka.streams.KafkaStreams;
@@ -33,29 +30,26 @@ public class KStreams {
 
         streamsConfiguration.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
 
-        final Serializer<JsonNode> jsonSerializer = new JsonSerializer();
+        final Serializer<String> jsonSerializer = new StringSerializer();
         // load a simple json deserializer
-        final Deserializer<JsonNode> jsonDeserializer = new JsonDeserializer();
+        final Deserializer<String> jsonDeserializer = new StringDeserializer();
 
-        final Serde<JsonNode> jsonSerde = Serdes.serdeFrom(jsonSerializer, jsonDeserializer);
+        final Serde<String> jsonSerde = Serdes.serdeFrom(jsonSerializer, jsonDeserializer);
 
         // Setup a string Serde for the key portion of the messages
         final Serde<String> stringSerde = Serdes.String();
 
         final KStreamBuilder builder = new KStreamBuilder();
 
-        KStream<String, JsonNode> source = builder.stream(stringSerde, jsonSerde, "test");
+        KStream<String, String> source = builder.stream(stringSerde, jsonSerde, "TweetHashTags1");
 
-        Predicate<String, JsonNode> isFirstHost = (k, v) ->
-//                v.path("language")                           // Read the value of "host" from the json object
-//                        .asText()                                // Turn it into a String -> This is a gotcha for newbies like me...
-//                        .equals("en");
-        v.path("screenName").asText().equalsIgnoreCase("apple");
+        Predicate<String, String> isFirstHost = (k, v) ->
+                v.contains("#Google") && Long.valueOf(k)>1;
 
-        KStream<String, JsonNode> firstHost = source.filter(isFirstHost);
+        KStream<String, String> firstHost = source.filter(isFirstHost);
 
 
-        firstHost.to(stringSerde, jsonSerde, "test1");
+        firstHost.to(stringSerde, jsonSerde, "googlehashtags");
         final KafkaStreams streams = new KafkaStreams(builder, streamsConfiguration);
         streams.cleanUp();
         streams.start();
